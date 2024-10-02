@@ -72,14 +72,23 @@ app.get("/view", async (req, res) => {
 
         if (docSnap.exists) {
             const data = docSnap.data();
-            res.json(data.ideas);
+            const ideas = data.ideas.map(idea => ({
+                name: idea.name,
+                idea: idea.idea,
+                desc: idea.desc
+            }));
+
+            res.json(ideas); 
         } else {
+            console.log("No such document!");
             res.status(404).send("No such document!");
         }
     } catch (error) {
+        console.error("Error retrieving document: ", error);
         res.status(500).send("Error retrieving document");
     }
 });
+
 
 const PORT = process.env.PORT || 5000;
 
