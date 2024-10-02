@@ -3,6 +3,7 @@ import bodyParser from 'body-parser';
 import admin from 'firebase-admin';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cache from 'memory-cache';  // Import memory-cache
 
 const app = express();
 app.use(bodyParser.json());
@@ -27,6 +28,9 @@ try {
 
 const db = admin.firestore();
 
+
+const cacheDuration = 15 * 60 * 1000;
+
 async function writeIdeaData(name, idea, desc) {
     try {
       const ideaData = {
@@ -47,8 +51,8 @@ async function writeIdeaData(name, idea, desc) {
       console.error("Error writing document: ", error);
       throw error;
     }
-  }
-  
+}
+
 app.post('/submit', async (req, res) => {
     const { name, idea, desc } = req.body;
 
@@ -58,6 +62,10 @@ app.post('/submit', async (req, res) => {
 
     try {
         await writeIdeaData(name, idea, desc);
+
+        // Clear the cache for /view after a new idea is submitted
+        cache.del('/view');
+        
         res.send("Idea submitted successfully!");
     } catch (error) {
         console.error("Error submitting idea: ", error);
@@ -66,6 +74,12 @@ app.post('/submit', async (req, res) => {
 });
 
 app.get("/view", async (req, res) => {
+    // Check if cached data exists
+    const cachedIdeas = cache.get('/view');
+    if (cachedIdeas) {
+        return res.json(cachedIdeas); // Return cached data if available
+    }
+
     try {
         const docRef = db.collection('ideas').doc('ideasCollection');
         const docSnap = await docRef.get();
@@ -78,6 +92,9 @@ app.get("/view", async (req, res) => {
                 desc: idea.desc
             }));
 
+            // Store the result in cache
+            cache.put('/view', ideas, cacheDuration);
+
             res.json(ideas); 
         } else {
             console.log("No such document!");
@@ -88,7 +105,6 @@ app.get("/view", async (req, res) => {
         res.status(500).send("Error retrieving document");
     }
 });
-
 
 const PORT = process.env.PORT || 5000;
 
