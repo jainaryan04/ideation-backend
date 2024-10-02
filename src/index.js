@@ -3,7 +3,6 @@ import bodyParser from 'body-parser';
 import admin from 'firebase-admin';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import cache from 'memory-cache';  // Import memory-cache
 
 const app = express();
 app.use(bodyParser.json());
@@ -27,9 +26,6 @@ try {
 }
 
 const db = admin.firestore();
-
-
-const cacheDuration = 15 * 60 * 1000;
 
 async function writeIdeaData(name, idea, desc) {
     try {
@@ -62,47 +58,10 @@ app.post('/submit', async (req, res) => {
 
     try {
         await writeIdeaData(name, idea, desc);
-
-        // Clear the cache for /view after a new idea is submitted
-        cache.del('/view');
-        
         res.send("Idea submitted successfully!");
     } catch (error) {
         console.error("Error submitting idea: ", error);
         res.status(500).send("Error submitting idea");
-    }
-});
-
-app.get("/view", async (req, res) => {
-    // Check if cached data exists
-    const cachedIdeas = cache.get('/view');
-    if (cachedIdeas) {
-        return res.json(cachedIdeas); // Return cached data if available
-    }
-
-    try {
-        const docRef = db.collection('ideas').doc('ideasCollection');
-        const docSnap = await docRef.get();
-
-        if (docSnap.exists) {
-            const data = docSnap.data();
-            const ideas = data.ideas.map(idea => ({
-                name: idea.name,
-                idea: idea.idea,
-                desc: idea.desc
-            }));
-
-            // Store the result in cache
-            cache.put('/view', ideas, cacheDuration);
-
-            res.json(ideas); 
-        } else {
-            console.log("No such document!");
-            res.status(404).send("No such document!");
-        }
-    } catch (error) {
-        console.error("Error retrieving document: ", error);
-        res.status(500).send("Error retrieving document");
     }
 });
 
